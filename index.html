@@ -5,7 +5,6 @@
     <title>Освітній план</title>
     <!-- Tailwind CSS -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-
     <style>
         @media print {
             @page {
@@ -30,8 +29,46 @@
             h3 {
                 text-align: center;
             }
-        }
 
+            /* Force table layout to 3 columns only */
+            table {
+                width: 100% !important;
+                table-layout: fixed !important;
+            }
+
+            /* Set explicit widths for the first 3 columns */
+            table th:nth-child(1),
+            table td:nth-child(1) {
+                width: 20% !important;
+            }
+
+            table th:nth-child(2),
+            table td:nth-child(2) {
+                width: 30% !important;
+            }
+
+            table th:nth-child(3),
+            table td:nth-child(3) {
+                width: 50% !important;
+            }
+
+            /* Completely eliminate the fourth column */
+            table th:nth-child(4),
+            table td:nth-child(4),
+            table colgroup col:nth-child(4) {
+                width: 0 !important;
+                max-width: 0 !important;
+                min-width: 0 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                border: 0 !important;
+                display: none !important;
+                visibility: collapse !important;
+                opacity: 0 !important;
+                position: absolute !important;
+                clip: rect(0, 0, 0, 0) !important;
+            }
+        }
         .hidden {
             display: none;
         }
@@ -187,8 +224,16 @@
 
             saveData(); // Save current state before editing
 
-            // Make table cells editable
-            table.setAttribute('contenteditable', 'true');
+            // Make only table cells editable, excluding buttons
+            table.querySelectorAll('td').forEach(cell => {
+                cell.setAttribute('contenteditable', 'true');
+                
+                // Prevent buttons from being editable
+                cell.querySelectorAll('button').forEach(btn => {
+                    btn.setAttribute('contenteditable', 'false');
+                });
+            });
+
             title.setAttribute('contenteditable', 'true');
             subtitle.setAttribute('contenteditable', 'true');
             button.textContent = 'Зберегти';
@@ -293,58 +338,70 @@
             render();
             alert('Зміни скасовано!');
         }
+function printWeek(weekIndex) {
+    const week = JSON.parse(JSON.stringify(weeksData[weekIndex])); // Deep copy to avoid modifying original data
 
-        function printWeek(weekIndex) {
-            const week = weeksData[weekIndex];
-            const printWindow = window.open('', '', 'height=800,width=1200');
-            printWindow.document.write('<html lang="uk"><head><title>Друк таблиці</title>');
-            printWindow.document.write(`
-                <style>
-                    @page {
-                        size: A4 landscape;
-                        margin: 20mm;
-                    }
-                    body {
-                        font-family: Arial, sans-serif;
-                        padding: 20px;
-                    }
-                    h1, h2, h3 {
-                        text-align: center;
-                    }
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin-top: 20px;
-                    }
-                    th, td {
-                        border: 1px solid #ddd;
-                        padding: 10px;
-                        text-align: left;
-                        vertical-align: top;
-                    }
-                    th {
-                        background-color: #f4f4f4;
-                    }
-                    button {
-                        display: none !important;
-                    }
-                    .hidden {
-                        display: none;
-                    }
-                </style>
-            `);
-            printWindow.document.write('</head><body>');
-            printWindow.document.write('<h1>Освітній план на ' + planInfo.dateRange + ' ' + planInfo.year + '</h1>');
-            printWindow.document.write('<h2>' + week.title + '</h2>');
-            printWindow.document.write('<h3>' + week.subtitle + '</h3>');
-            printWindow.document.write(generateWeekTableHTML(week, weekIndex, false));
-            printWindow.document.write('</body></html>');
-            printWindow.document.close();
-            printWindow.onload = function () {
-                printWindow.focus();
-                printWindow.print();
-                printWindow.close();
-            };
+    // Remove the "Дії" column data before generating the HTML
+    week.days.forEach(day => {
+        delete day.actions; // Assuming "actions" is the property for the 4th column data
+    });
+
+    const printWindow = window.open('', '', 'height=800,width=1200');
+    printWindow.document.write('<html lang="uk"><head><title>Друк таблиці</title>');
+    printWindow.document.write(`
+        <style>
+            @page {
+                size: A4 landscape;
+                margin: 20mm;
+            }
+            body {
+                font-family: Arial, sans-serif;
+                padding: 20px;
+            }
+            h1, h2, h3 {
+                text-align: center;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+                table-layout: fixed;
+            }
+            th, td {
+                border: 1px solid #ddd;
+                padding: 10px;
+                text-align: left;
+                vertical-align: top;
+            }
+            th {
+                background-color: #f4f4f4;
+            }
+            button {
+                display: none !important;
+            }
+            .hidden {
+                display: none;
+            }
+            /* Explicitly set 3 columns for the table */
+            table th:nth-child(1), table td:nth-child(1) { width: 25%; }
+            table th:nth-child(2), table td:nth-child(2) { width: 35%; }
+            table th:nth-child(3), table td:nth-child(3) { width: 40%; }
+            /* Hide any remaining 4th column elements just in case */
+            table th:nth-child(4), table td:nth-child(4) { display: none !important; }
+        </style>
+    `);
+    printWindow.document.write('</head><body>');
+    printWindow.document.write('<h1>Освітній план на ' + planInfo.dateRange + ' ' + planInfo.year + '</h1>');
+    printWindow.document.write('<h2>' + week.title + '</h2>');
+    printWindow.document.write('<h3>' + week.subtitle + '</h3>');
+    printWindow.document.write(generateWeekTableHTML(week, weekIndex, false));
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.onload = function () {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+    };
         }
 
         function generateWeekTableHTML(week, weekIndex = null, forEditing = true) {
@@ -357,6 +414,7 @@
                         <th class="border p-2 font-bold">День</th>
                         <th class="border p-2 font-bold">Тема дня</th>
                         <th class="border p-2 font-bold">Основні заходи</th>
+                        <th class="border p-2 font-bold">Дії</th>
                     </tr>
                 </thead>` : ''}
                 <tbody>
@@ -390,8 +448,10 @@
                         <td class="border p-2 align-top">
                             ${activitiesHTML}
                             ${additionalSection}
+                        </td>
+                        <td class="border p-2 align-top no-print">
                             ${weekIndex !== null ? `
-                            <div class="flex gap-2 mt-2 no-print">
+                            <div class="flex gap-2">
                                 <button class="toggle-button inline-flex items-center bg-gray-600 text-white px-3 py-1.5 rounded-md hover:bg-gray-500 text-xs" data-week-index="${weekIndex}" data-day-index="${dayIndex}">
                                     ${toggleButtonText}
                                 </button>
@@ -463,7 +523,6 @@
             updatePlanInfoUI();
             bindEvents();
         }
-
         function bindEvents() {
             document.querySelectorAll('.edit-button').forEach(btn => {
                 btn.onclick = function () {
@@ -513,13 +572,14 @@
                 };
             });
 
+            // Update this section to bind toggle buttons
             document.querySelectorAll('.toggle-button').forEach(btn => {
                 btn.onclick = function () {
                     const wIndex = parseInt(this.getAttribute('data-week-index'), 10);
                     const dIndex = parseInt(this.getAttribute('data-day-index'), 10);
                     const dayData = weeksData[wIndex].days[dIndex];
 
-                    const activitiesCell = btn.closest('td');
+                    const activitiesCell = btn.closest('tr').querySelector('td:nth-child(3)');
                     const additionalSection = activitiesCell.querySelector('.additional-section');
 
                     if (additionalSection) {
@@ -558,7 +618,6 @@
                 };
             });
         }
-
         // Handle year/date range editing
         editYearButton.addEventListener('click', () => {
             if (!editingYear) {
