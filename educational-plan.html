@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Освітній план</title>
+    <!-- Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+
+    <style>
+        @media print {
+            @page {
+                size: A4 landscape;
+                margin: 20mm;
+            }
+
+            body {
+                margin: 0;
+                padding: 0;
+                font-family: Arial, sans-serif;
+            }
+
+            /* Hide all buttons and elements marked as no-print on printed page */
+            button,
+            .no-print {
+                display: none !important;
+            }
+
+            h1,
+            h2,
+            h3 {
+                text-align: center;
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Ensure hr spans full width of parent cell */
+        .additional-section hr {
+            width: 100%;
+            display: block;
+        }
+
+        .formatting-toolbar {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .formatting-toolbar button {
+            background: #4B5563; /* gray-700 */
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+        }
+
+        .formatting-toolbar button:hover {
+            background: #374151; /* gray-800 */
+        }
+    </style>
+</head>
+
+<body class="font-sans text-gray-800">
+    <div class="max-w-6xl mx-auto py-10 px-4">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold mb-2">
+                Освітній план на
+                <span class="date-range font-normal" contenteditable="false"></span>
+                <span class="year font-normal" contenteditable="false"></span>
+            </h1>
+            <button
+                class="edit-year-button inline-flex items-center bg-gray-700 text-white px-3 py-1.5 rounded-md hover:bg-gray-600 no-print">
+                Редагувати рік
+            </button>
+        </div>
+
+        <div id="weeks-container"></div>
+    </div>
+
+    <script>
+        let planInfo = JSON.parse(localStorage.getItem('planInfo')) || { dateRange: 'грудень', year: '2024' };
+        let weeksData = JSON.parse(localStorage.getItem('weeksData')) || [
+            {
+                title: 'Тиждень 1 (2–6 грудня): "Перші кроки зими"',
+                subtitle: 'Тема тижня: «Іграшки»',
+                headersHidden: false,
+                days: [
+                    {
+                        day: '<b>Понеділок – 2.12</b>',
+                        dailyTitle: 'Зустріч із зимою',
+                        activities: [
+                            'Музична діяльність (09:30–09:50)',
+                            'Ознайомлення з природою: "Спостереження за першими сніжинками"',
+                            '<i>Малювання: "Зимовий пейзаж"</i>',
+                            'Фізичний розвиток (10:00–10:20)'
+                        ],
+                        additional: 'Вечірнє читання казок про зиму.',
+                        showAdditional: false // Track visibility
+                    },
+                    {
+                        day: 'Вівторок – 3.12',
+                        dailyTitle: 'Сніжинки-танцівниці',
+                        activities: [
+                            'Ознайомлення з природою: "Як утворюється сніг?"',
+                            '<u>Ліплення: "Сніговик"</u>',
+                            'Англійська мова (11:00–11:30)'
+                        ],
+                        additional: 'Перегляд мультфільму про зиму.',
+                        showAdditional: false // Track visibility
+                    }
+                ]
+            }
+        ];
+
+        const weeksContainer = document.getElementById('weeks-container');
+        const editYearButton = document.querySelector('.edit-year-button');
+        const dateRangeSpan = document.querySelector('.date-range');
+        const yearSpan = document.querySelector('.year');
+
+        let editingYear = false;
+
+        function saveData() {
+            localStorage.setItem('weeksData', JSON.stringify(weeksData));
+        }
+
+        function savePlanInfo() {
+            localStorage.setItem('planInfo', JSON.stringify(planInfo));
+        }
+
+        function updatePlanInfoUI() {
+            dateRangeSpan.textContent = planInfo.dateRange;
+            yearSpan.textContent = planInfo.year;
+        }
+
+        function addWeek(afterIndex = null) {
+            const newWeek = {
+                title: 'Новий тиждень',
+                subtitle: 'Тема тижня: «Нова тема»',
+                headersHidden: false,
+                days: []
+            };
+            if (afterIndex === null || afterIndex === weeksData.length - 1) {
+                weeksData.push(newWeek);
+            } else {
+                weeksData.splice(afterIndex + 1, 0, newWeek);
+            }
+            render();
+        }
+
+        function removeWeek(weekIndex) {
+            if (confirm('Ви впевнені, що хочете видалити цей тиждень?')) {
+                weeksData.splice(weekIndex, 1);
+                render();
+            }
+        }
+
+        function addDay(weekIndex) {
+            weeksData[weekIndex].days.push({
+                day: 'День для редагування',
+                dailyTitle: 'Тема для редагування',
+                activities: ['Змінити цю діяльність'],
+                additional: 'Змінити додатковий текст',
+                showAdditional: false
+            });
+            render();
+        }
+
+        function removeDay(weekIndex, dayIndex) {
+            if (confirm('Ви впевнені, що хочете видалити цей день?')) {
+                weeksData[weekIndex].days.splice(dayIndex, 1);
+                render();
+            }
+        }
+
+        function enterEditMode(weekIndex, button) {
+            const container = document.getElementById(`container${weekIndex}`);
+            const table = container.querySelector('table');
+            const title = container.querySelector('.title');
+            const subtitle = container.querySelector('.subtitle');
+            const cancelButton = container.querySelector('.cancel-button');
+
+            // Hide other buttons during edit mode
+            container.querySelectorAll('.print-button, .remove-week-button, .add-day-button, .add-week-button, .toggle-headers-button')
+                .forEach(b => b.classList.add('hidden'));
+
+            saveData(); // Save current state before editing
+
+            // Make table cells editable
+            table.setAttribute('contenteditable', 'true');
+            title.setAttribute('contenteditable', 'true');
+            subtitle.setAttribute('contenteditable', 'true');
+            button.textContent = 'Зберегти';
+            button.classList.add('save');
+            cancelButton.classList.remove('hidden');
+
+            // Insert formatting toolbar dynamically when entering edit mode
+            const formattingToolbar = document.createElement('div');
+            formattingToolbar.className = 'formatting-toolbar no-print';
+            formattingToolbar.innerHTML = `
+                <button data-command="bold" title="Bold (Ctrl+B)">B</button>
+                <button data-command="italic" title="Italic (Ctrl+I)">I</button>
+                <button data-command="underline" title="Underline (Ctrl+U)">U</button>
+            `;
+            // Insert formatting toolbar above the table
+            container.insertBefore(formattingToolbar, table);
+
+            // Bind formatting commands
+            formattingToolbar.querySelectorAll('button[data-command]').forEach(btn => {
+                btn.onclick = function () {
+                    const command = this.getAttribute('data-command');
+                    document.execCommand(command, false, null);
+                };
+            });
+        }
+
+        function saveChanges(weekIndex, button) {
+            const container = document.getElementById(`container${weekIndex}`);
+            const table = container.querySelector('table');
+            const title = container.querySelector('.title');
+            const subtitle = container.querySelector('.subtitle');
+            const cancelButton = container.querySelector('.cancel-button');
+            const formattingToolbar = container.querySelector('.formatting-toolbar');
+
+            table.removeAttribute('contenteditable');
+            title.removeAttribute('contenteditable');
+            subtitle.removeAttribute('contenteditable');
+
+            // Save title and subtitle as HTML to preserve formatting
+            weeksData[weekIndex].title = title.innerHTML;
+            weeksData[weekIndex].subtitle = subtitle.innerHTML;
+
+            const rows = table.querySelectorAll('tbody tr');
+            let updatedDays = [];
+            rows.forEach((row, dIndex) => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length < 3) return;
+                // Use innerHTML to preserve formatting
+                const dayText = cells[0].innerHTML.trim();
+                const dailyTitle = cells[1].innerHTML.trim();
+
+                const activitiesCell = cells[2];
+                const ol = activitiesCell.querySelector('ol');
+                let activities = [];
+                if (ol) {
+                    const liElements = ol.querySelectorAll('li');
+                    liElements.forEach(li => {
+                        activities.push(li.innerHTML.trim());
+                    });
+                }
+
+                const additionalSection = activitiesCell.querySelector('.additional-section');
+                let additional = '';
+                let showAdditional = false;
+                if (additionalSection) {
+                    const p = additionalSection.querySelector('p');
+                    additional = p ? p.innerHTML.trim() : '';
+                    // If additionalSection does NOT have 'hidden', it means user showed it
+                    showAdditional = !additionalSection.classList.contains('hidden');
+                }
+
+                updatedDays.push({
+                    day: dayText,
+                    dailyTitle: dailyTitle,
+                    activities: activities,
+                    additional: additional,
+                    showAdditional: showAdditional
+                });
+            });
+
+            weeksData[weekIndex].days = updatedDays;
+
+            saveData();
+            button.textContent = 'Змінити';
+            button.classList.remove('save');
+            cancelButton.classList.add('hidden');
+
+            // Remove formatting toolbar after saving
+            if (formattingToolbar) {
+                formattingToolbar.remove();
+            }
+
+            // Show hidden buttons after saving
+            container.querySelectorAll('.print-button, .remove-week-button, .add-day-button, .add-week-button, .toggle-headers-button')
+                .forEach(b => b.classList.remove('hidden'));
+
+            alert('Зміни збережено!');
+        }
+
+        function cancelChanges(weekIndex, button) {
+            weeksData = JSON.parse(localStorage.getItem('weeksData')) || [];
+            render();
+            alert('Зміни скасовано!');
+        }
+
+        function printWeek(weekIndex) {
+            const week = weeksData[weekIndex];
+            const printWindow = window.open('', '', 'height=800,width=1200');
+            printWindow.document.write('<html lang="uk"><head><title>Друк таблиці</title>');
+            printWindow.document.write(`
+                <style>
+                    @page {
+                        size: A4 landscape;
+                        margin: 20mm;
+                    }
+                    body {
+                        font-family: Arial, sans-serif;
+                        padding: 20px;
+                    }
+                    h1, h2, h3 {
+                        text-align: center;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-top: 20px;
+                    }
+                    th, td {
+                        border: 1px solid #ddd;
+                        padding: 10px;
+                        text-align: left;
+                        vertical-align: top;
+                    }
+                    th {
+                        background-color: #f4f4f4;
+                    }
+                    button {
+                        display: none !important;
+                    }
+                    .hidden {
+                        display: none;
+                    }
+                </style>
+            `);
+            printWindow.document.write('</head><body>');
+            printWindow.document.write('<h1>Освітній план на ' + planInfo.dateRange + ' ' + planInfo.year + '</h1>');
+            printWindow.document.write('<h2>' + week.title + '</h2>');
+            printWindow.document.write('<h3>' + week.subtitle + '</h3>');
+            printWindow.document.write(generateWeekTableHTML(week, weekIndex, false));
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.onload = function () {
+                printWindow.focus();
+                printWindow.print();
+                printWindow.close();
+            };
+        }
+
+        function generateWeekTableHTML(week, weekIndex = null, forEditing = true) {
+            const showThead = !(weekIndex !== null && weeksData[weekIndex].headersHidden);
+            let html = `
+            <table class="w-full border border-gray-300 mt-4 text-sm">
+                ${showThead ? `
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="border p-2 font-bold">День</th>
+                        <th class="border p-2 font-bold">Тема дня</th>
+                        <th class="border p-2 font-bold">Основні заходи</th>
+                    </tr>
+                </thead>` : ''}
+                <tbody>
+            `;
+
+            (week.days || []).forEach((day, dayIndex) => {
+                let activitiesHTML = '<ol class="list-decimal ml-5">';
+                day.activities.forEach(act => {
+                    activitiesHTML += `<li class="my-1">${act}</li>`;
+                });
+                activitiesHTML += '</ol>';
+
+                // Use day.showAdditional to decide if we add 'hidden' or not
+                let additionalSectionClass = day.showAdditional ? 'additional-section mt-2' : 'additional-section mt-2 hidden';
+                let toggleButtonText = day.showAdditional ? 'Сховати' : 'Додатково';
+
+                let additionalSection = '';
+                if (day.additional && day.additional.trim() !== '') {
+                    additionalSection = `
+                        <div class="${additionalSectionClass}">
+                            <hr class="my-2">
+                            <p class="text-sm text-gray-700">${day.additional}</p>
+                        </div>
+                    `;
+                }
+
+                html += `
+                    <tr>
+                        <td class="border p-2 align-top">${day.day}</td>
+                        <td class="border p-2 align-top">${day.dailyTitle}</td>
+                        <td class="border p-2 align-top">
+                            ${activitiesHTML}
+                            ${additionalSection}
+                            ${weekIndex !== null ? `
+                            <div class="flex gap-2 mt-2 no-print">
+                                <button class="toggle-button inline-flex items-center bg-gray-600 text-white px-3 py-1.5 rounded-md hover:bg-gray-500 text-xs" data-week-index="${weekIndex}" data-day-index="${dayIndex}">
+                                    ${toggleButtonText}
+                                </button>
+                                <button class="remove-day-button inline-flex items-center bg-red-600 text-white px-3 py-1.5 rounded-md hover:bg-red-500 text-xs" data-week-index="${weekIndex}" data-day-index="${dayIndex}">
+                                    Видалити день
+                                </button>
+                            </div>
+                            ` : ''}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+            return html;
+        }
+
+        function render() {
+            weeksContainer.innerHTML = '';
+            weeksData.forEach((week, wIndex) => {
+                const container = document.createElement('div');
+                container.className = 'table-container bg-white rounded-md shadow p-6 mb-8';
+                container.id = `container${wIndex}`;
+
+                // Determine the button text based on whether headers are hidden
+                const toggleHeadersText = weeksData[wIndex].headersHidden ? 'Показати заголовок' : 'Приховати заголовок';
+
+                container.innerHTML = `
+            <h2 class="title text-2xl font-semibold text-center">${week.title}</h2>
+            <h3 class="subtitle text-xl text-gray-700 text-center mt-2">${week.subtitle}</h3>
+            
+            <!-- Toggle headers button placed directly above the table -->
+            <div class="no-print text-center my-4">
+                <button class="toggle-headers-button inline-flex items-center bg-yellow-600 text-white px-3 py-1.5 rounded-md hover:bg-yellow-500 text-xs">
+                    ${toggleHeadersText}
+                </button>
+            </div>
+            
+            ${generateWeekTableHTML(week, wIndex)}
+
+            <div class="button-group mt-4 flex flex-wrap justify-center gap-2 no-print">
+                <button class="edit-button inline-flex items-center bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-500" data-week-index="${wIndex}">
+                    Змінити
+                </button>
+                <button class="print-button inline-flex items-center bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-500" data-week-index="${wIndex}">
+                    Друкувати
+                </button>
+                <button class="cancel-button hidden inline-flex items-center bg-red-600 text-white px-3 py-1.5 rounded-md hover:bg-red-500" data-week-index="${wIndex}">
+                    Скасувати
+                </button>
+                <button class="remove-week-button inline-flex items-center bg-purple-600 text-white px-3 py-1.5 rounded-md hover:bg-purple-500" data-week-index="${wIndex}">
+                    Видалити тиждень
+                </button>
+            </div>
+            
+            <div class="mt-4 flex flex-wrap gap-2 no-print justify-center">
+                <button class="add-day-button inline-flex items-center bg-gray-600 text-white px-3 py-1.5 rounded-md hover:bg-gray-500" data-week-index="${wIndex}">
+                    Додати день
+                </button>
+                <button class="add-week-button bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-500 inline-flex items-center" data-week-index="${wIndex}">
+                    Додати тиждень
+                </button>
+            </div>
+        `;
+                weeksContainer.appendChild(container);
+            });
+
+            saveData();
+            updatePlanInfoUI();
+            bindEvents();
+        }
+
+        function bindEvents() {
+            document.querySelectorAll('.edit-button').forEach(btn => {
+                btn.onclick = function () {
+                    const wIndex = parseInt(this.getAttribute('data-week-index'), 10);
+                    if (this.classList.contains('save')) {
+                        saveChanges(wIndex, this);
+                    } else {
+                        enterEditMode(wIndex, this);
+                    }
+                };
+            });
+
+            document.querySelectorAll('.cancel-button').forEach(btn => {
+                btn.onclick = function () {
+                    const wIndex = parseInt(this.getAttribute('data-week-index'), 10);
+                    const editButton = document.querySelector(`.edit-button[data-week-index="${wIndex}"]`);
+                    cancelChanges(wIndex, editButton);
+                };
+            });
+
+            document.querySelectorAll('.print-button').forEach(btn => {
+                btn.onclick = function () {
+                    const wIndex = parseInt(this.getAttribute('data-week-index'), 10);
+                    printWeek(wIndex);
+                };
+            });
+
+            document.querySelectorAll('.remove-week-button').forEach(btn => {
+                btn.onclick = function () {
+                    const wIndex = parseInt(this.getAttribute('data-week-index'), 10);
+                    removeWeek(wIndex);
+                };
+            });
+
+            document.querySelectorAll('.add-day-button').forEach(btn => {
+                btn.onclick = function () {
+                    const wIndex = parseInt(this.getAttribute('data-week-index'), 10);
+                    addDay(wIndex);
+                };
+            });
+
+            document.querySelectorAll('.remove-day-button').forEach(btn => {
+                btn.onclick = function () {
+                    const wIndex = parseInt(this.getAttribute('data-week-index'), 10);
+                    const dIndex = parseInt(this.getAttribute('data-day-index'), 10);
+                    removeDay(wIndex, dIndex);
+                };
+            });
+
+            document.querySelectorAll('.toggle-button').forEach(btn => {
+                btn.onclick = function () {
+                    const wIndex = parseInt(this.getAttribute('data-week-index'), 10);
+                    const dIndex = parseInt(this.getAttribute('data-day-index'), 10);
+                    const dayData = weeksData[wIndex].days[dIndex];
+
+                    const activitiesCell = btn.closest('td');
+                    const additionalSection = activitiesCell.querySelector('.additional-section');
+
+                    if (additionalSection) {
+                        if (additionalSection.classList.contains('hidden')) {
+                            // Show it by removing .hidden
+                            additionalSection.classList.remove('hidden');
+                            btn.textContent = 'Сховати';
+                            dayData.showAdditional = true;
+                        } else {
+                            // Hide it by adding .hidden
+                            additionalSection.classList.add('hidden');
+                            btn.textContent = 'Додатково';
+                            dayData.showAdditional = false;
+                        }
+                        saveData();
+                    }
+                };
+            });
+
+            document.querySelectorAll('.add-week-button').forEach(btn => {
+                btn.onclick = function () {
+                    const wIndex = parseInt(this.getAttribute('data-week-index'), 10);
+                    addWeek(wIndex);
+                };
+            });
+
+            document.querySelectorAll('.toggle-headers-button').forEach(btn => {
+                btn.onclick = function () {
+                    const container = btn.closest('.table-container');
+                    const wIndex = parseInt(container.id.replace('container', ''), 10);
+
+                    // Toggle the headersHidden property
+                    weeksData[wIndex].headersHidden = !weeksData[wIndex].headersHidden;
+
+                    render();
+                };
+            });
+        }
+
+        // Handle year/date range editing
+        editYearButton.addEventListener('click', () => {
+            if (!editingYear) {
+                // Enter edit mode
+                dateRangeSpan.contentEditable = 'true';
+                yearSpan.contentEditable = 'true';
+                dateRangeSpan.focus();
+                editYearButton.textContent = 'Зберегти';
+                editingYear = true;
+            } else {
+                // Save mode
+                const newDateRange = dateRangeSpan.innerText.trim();
+                const newYear = yearSpan.innerText.trim();
+                if (!newDateRange || !newYear) {
+                    alert('Будь ласка, заповніть період і рік.');
+                    return;
+                }
+                planInfo.dateRange = newDateRange;
+                planInfo.year = newYear;
+                savePlanInfo();
+                dateRangeSpan.contentEditable = 'false';
+                yearSpan.contentEditable = 'false';
+                editYearButton.textContent = 'Редагувати рік';
+                editingYear = false;
+            }
+        });
+
+        // Initial setup
+        updatePlanInfoUI();
+        render();
+    </script>
+</body>
+</html>
